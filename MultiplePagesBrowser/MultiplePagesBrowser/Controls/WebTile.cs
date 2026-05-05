@@ -22,6 +22,10 @@ namespace MultiplePagesBrowser.Controls
     {
         /// <summary>由 MainWindow 注入，供所有 WebTile 读取共享设置</summary>
         public static MainViewModel? ViewModel { get; set; }
+
+        /// <summary>请求最大化/还原该格子（由 MainWindow 订阅处理）</summary>
+        public event EventHandler? MaximizeRequested;
+
         // ── UI 元素 ───────────────────────────────────────────────
         private readonly Border _tileBorder;
         private readonly ContentPresenter _webViewHost;
@@ -29,6 +33,7 @@ namespace MultiplePagesBrowser.Controls
         private readonly TextBlock _muteIcon;
         private readonly TextBlock _indexLabel;
         private readonly Border _activateOverlay;
+        private readonly Border _headerBar;   // Header 行（WPF 层，不受 Airspace 影响）
 
         // ── 状态 ──────────────────────────────────────────────────
         private WebView2? _webView;
@@ -45,43 +50,87 @@ namespace MultiplePagesBrowser.Controls
         public WebTile()
         {
             // ── 构建 UI 树 ────────────────────────────────────────
+            // 布局：
+            //   Row 0 — Header 条（纯 WPF，不受 WebView2 Airspace 遮挡）
+            //   Row 1 — WebView2 内容区 + 激活遮罩 + 加载指示器（叠加在 WebView2 上，
+            //            加载层仅在 WebView2 初始化前可见，之后 WebView2 会遮挡，但此时已不需要）
 
             _indexLabel = new TextBlock
             {
                 FontSize = 10,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0xBE, 0xC5)),
-                FontWeight = FontWeights.Bold
-            };
-
-            var indexBadge = new Border
-            {
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(4, 4, 0, 0),
-                Background = new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0)),
-                CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(4, 1, 4, 1),
-                Child = _indexLabel
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center
             };
 
             _muteIcon = new TextBlock
             {
                 Text = "🔇",
                 FontSize = 10,
-                Foreground = Brushes.White
+                Foreground = Brushes.White,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Collapsed
             };
 
-            var muteBadge = new Border
+            // ── Header 条（Row 0）──────────────────────────────────
+            // 双击 Header 触发最大化；单击激活格子
+            var headerContent = new Grid();
+            var numLabel = new TextBlock
             {
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 4, 4, 0),
-                Background = new SolidColorBrush(Color.FromArgb(0x99, 0, 0, 0)),
-                CornerRadius = new CornerRadius(3),
-                Padding = new Thickness(3, 1, 3, 1),
-                Child = _muteIcon
+                FontSize = 10,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x60, 0x7D, 0x8B)),
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(6, 0, 0, 0)
+            };
+            // 把 _indexLabel 合并到 headerContent
+            headerContent.Children.Add(numLabel);
+            headerContent.Children.Add(new TextBlock
+            {
+                Text = "⛶",
+                FontSize = 9,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x40, 0x55, 0x65)),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "双击最大化/还原此格子 (F11)"
+            });
+            var muteInHeader = _muteIcon;
+            muteInHeader.HorizontalAlignment = HorizontalAlignment.Right;
+            muteInHeader.Margin = new Thickness(0, 0, 6, 0);
+            headerContent.Children.Add(muteInHeader);
+
+            // 重用 _indexLabel → 改为 numLabel（二者指向同一文字，用 numLabel）
+            // 为了不破坏后续 _indexLabel 引用，让 _indexLabel 与 numLabel 同步
+            _indexLabel = numLabel;   // 重新指向 header 里的 label
+
+            _headerBar = new Border
+            {
+                Height = 18,
+                Background = new SolidColorBrush(Color.FromArgb(0xFF, 0x0D, 0x0D, 0x1B)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(0x44, 0x4F, 0xC3, 0xF7)),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Cursor = Cursors.Hand,
+                ToolTip = "双击最大化/还原 (F11)",
+                Child = headerContent
+            };
+            _headerBar.MouseLeftButtonDown += (s, e) =>
+            {
+                if (e.ClickCount == 2)
+                {
+                    MaximizeRequested?.Invoke(this, EventArgs.Empty);
+                    e.Handled = true;
+                }
+                else
+                {
+                    // 单击也激活格子
+                    if (_page != null && !_page.IsActive)
+                        TileActivationRequested?.Invoke(this, _page);
+                    e.Handled = true;
+                }
             };
 
+            // ── 加载指示器（初始化期间显示，WebView2 就绪后几乎不可见）──
             var loadingBar = new ProgressBar
             {
                 IsIndeterminate = true,
@@ -91,7 +140,6 @@ namespace MultiplePagesBrowser.Controls
                 Background = new SolidColorBrush(Color.FromRgb(0x2A, 0x2A, 0x4A)),
                 Margin = new Thickness(0, 0, 0, 6)
             };
-
             var loadingText = new TextBlock
             {
                 Text = "加载中...",
@@ -99,7 +147,6 @@ namespace MultiplePagesBrowser.Controls
                 HorizontalAlignment = HorizontalAlignment.Center,
                 FontSize = 12
             };
-
             var loadingStack = new StackPanel
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -107,7 +154,6 @@ namespace MultiplePagesBrowser.Controls
             };
             loadingStack.Children.Add(loadingBar);
             loadingStack.Children.Add(loadingText);
-
             _loadingOverlay = new Border
             {
                 Background = new SolidColorBrush(Color.FromArgb(0xCC, 0x1A, 0x1A, 0x2E)),
@@ -125,12 +171,20 @@ namespace MultiplePagesBrowser.Controls
 
             _webViewHost = new ContentPresenter();
 
-            var innerGrid = new Grid();
-            innerGrid.Children.Add(_webViewHost);
-            innerGrid.Children.Add(_loadingOverlay);
-            innerGrid.Children.Add(muteBadge);
-            innerGrid.Children.Add(indexBadge);
-            innerGrid.Children.Add(_activateOverlay);
+            // WebView2 区（Row 1）
+            var contentGrid = new Grid();
+            contentGrid.Children.Add(_webViewHost);
+            contentGrid.Children.Add(_loadingOverlay);
+            contentGrid.Children.Add(_activateOverlay);
+
+            // 外层 Grid：Row0=Header  Row1=内容
+            var outerGrid = new Grid();
+            outerGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            outerGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            Grid.SetRow(_headerBar, 0);
+            Grid.SetRow(contentGrid, 1);
+            outerGrid.Children.Add(_headerBar);
+            outerGrid.Children.Add(contentGrid);
 
             _tileBorder = new Border
             {
@@ -138,15 +192,12 @@ namespace MultiplePagesBrowser.Controls
                 BorderBrush = InactiveBrush,
                 CornerRadius = new CornerRadius(4),
                 ClipToBounds = true,
-                Child = innerGrid
+                Child = outerGrid
             };
 
             Content = _tileBorder;
             MinWidth = 120;
             MinHeight = 90;
-
-            // Ctrl+V 在 WPF 层拦截（WebView2 已获焦时 WPF KeyDown 不会触发，
-            // 但 MainWindow.xaml.cs 的 Window_KeyDown 可以转发给 ActiveTile）
         }
 
         /// <summary>由 MainWindow 在 Window_KeyDown 中转发 Ctrl+V 给当前激活格子</summary>
@@ -174,9 +225,9 @@ namespace MultiplePagesBrowser.Controls
                     _page.PropertyChanged += Page_PropertyChanged;
                     _indexLabel.Text = (_page.Index + 1).ToString();
                     // 尊重设置中的编号显示选项
-                    var badge = _indexLabel.Parent as Border ?? (_indexLabel.Parent as FrameworkElement);
-                    if (badge?.Parent is Border b) b.Visibility =
-                        (ViewModel?.Settings.ShowTileNumbers ?? true) ? Visibility.Visible : Visibility.Collapsed;
+                    _headerBar.Visibility =
+                        (ViewModel?.Settings.ShowTileNumbers ?? true)
+                            ? Visibility.Visible : Visibility.Collapsed;
                     InitWebView();
                 }
             }
@@ -336,6 +387,16 @@ namespace MultiplePagesBrowser.Controls
         private void UpdateActiveStyle(bool isActive)
         {
             _tileBorder.BorderBrush = isActive ? ActiveBrush : InactiveBrush;
+            // Header 条颜色跟随激活状态
+            _headerBar.Background = isActive
+                ? new SolidColorBrush(Color.FromArgb(0xFF, 0x0A, 0x1E, 0x35))
+                : new SolidColorBrush(Color.FromArgb(0xFF, 0x0D, 0x0D, 0x1B));
+            _headerBar.BorderBrush = isActive
+                ? new SolidColorBrush(Color.FromArgb(0xAA, 0x4F, 0xC3, 0xF7))
+                : new SolidColorBrush(Color.FromArgb(0x44, 0x4F, 0xC3, 0xF7));
+            _indexLabel.Foreground = isActive
+                ? new SolidColorBrush(Color.FromRgb(0x4F, 0xC3, 0xF7))
+                : new SolidColorBrush(Color.FromRgb(0x60, 0x7D, 0x8B));
             _activateOverlay.Visibility = Visibility.Collapsed;
 
             if (!_webViewReady || _webView?.CoreWebView2 == null) return;
@@ -455,9 +516,41 @@ namespace MultiplePagesBrowser.Controls
             extItem.CustomItemSelected += (s, _) =>
                 Dispatcher.Invoke(OpenInExternalBrowser);
             items.Add(extItem);
+
+            // 分割线
+            items.Add(env.CreateContextMenuItem(
+                string.Empty, null, CoreWebView2ContextMenuItemKind.Separator));
+
+            // 收藏到书签 / 取消收藏
+            bool isBookmarked = hasPageUrl && BookmarkStore.Contains(_page!.Url);
+            var bmItem = env.CreateContextMenuItem(
+                isBookmarked ? "★  从书签移除" : "☆  添加到书签",
+                null, CoreWebView2ContextMenuItemKind.Command);
+            bmItem.IsEnabled = hasPageUrl;
+            bmItem.CustomItemSelected += (s, _) =>
+                Dispatcher.Invoke(() =>
+                {
+                    if (_page == null) return;
+                    if (BookmarkStore.Contains(_page.Url))
+                        BookmarkStore.Remove(_page.Url);
+                    else
+                        BookmarkStore.Add(_page.Url, _page.Title);
+                });
+            items.Add(bmItem);
         }
 
         // ── 辅助方法 ──────────────────────────────────────────────────────────────
+
+        /// <summary>将当前格子页面添加到书签（由 MainWindow Ctrl+D 调用）</summary>
+        public void AddBookmark()
+        {
+            if (_page == null || string.IsNullOrEmpty(_page.Url) || _page.Url == "about:blank")
+                return;
+            if (BookmarkStore.Contains(_page.Url))
+                BookmarkStore.Remove(_page.Url);
+            else
+                BookmarkStore.Add(_page.Url, _page.Title);
+        }
 
         private static bool IsValidUrl(string text) =>
             Uri.TryCreate(text, UriKind.Absolute, out var uri) &&

@@ -167,6 +167,66 @@ namespace MultiplePagesBrowser.ViewModels
                 p.Url = url;
         }
 
+        /// <summary>
+        /// 从文本中提取所有有效 URL（每行一个或空格/逗号分隔）。
+        /// </summary>
+        public static List<string> ExtractUrls(string text)
+        {
+            var result = new List<string>();
+            if (string.IsNullOrWhiteSpace(text)) return result;
+
+            // 按换行、逗号、制表符、分号分割，再逐个检查
+            var tokens = text.Split(new[] { '\r', '\n', '\t', ',', ';' },
+                StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var token in tokens)
+            {
+                var t = token.Trim();
+                if (string.IsNullOrEmpty(t)) continue;
+
+                // 补全协议头
+                if (!t.StartsWith("http://") && !t.StartsWith("https://"))
+                    t = "https://" + t;
+
+                if (Uri.TryCreate(t, UriKind.Absolute, out var uri) &&
+                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                    result.Add(t);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// 打开多个 URL：自动扩展布局（取最接近且 >= url数量 的布局），
+        /// 超出现有格子数时创建新 PageItem，再逐格导航。
+        /// </summary>
+        public void NavigateMultiple(List<string> urls)
+        {
+            if (urls.Count == 0) return;
+
+            // 找到能容纳所有 URL 的最小布局
+            int needed = urls.Count;
+            int bestIdx = LayoutPresets.Length - 1; // 默认最大布局
+            for (int i = 0; i < LayoutPresets.Length; i++)
+            {
+                var (c, r) = LayoutPresets[i];
+                if (c * r >= needed)
+                {
+                    bestIdx = i;
+                    break;
+                }
+            }
+
+            // 切换布局（会触发 LayoutApplied 通知 UI）
+            LayoutIndex = bestIdx;
+
+            // 逐个格子赋值 URL
+            for (int i = 0; i < urls.Count && i < Pages.Count; i++)
+                Pages[i].Url = urls[i];
+
+            // 激活第一个格子
+            ActivePage = Pages[0];
+        }
+
         public event PropertyChangedEventHandler? PropertyChanged;
         protected void OnPropertyChanged([CallerMemberName] string? name = null)
             => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));

@@ -220,7 +220,7 @@
 
                     <!-- 同步导航 -->
                     <Button Style="{StaticResource ToolBtn}" Margin="0,0,4,0"
-                            Content="同步导航" ToolTip="所有格子同时打开当前地址"
+                            Content="同步导航" ToolTip="所有格子同时打开当前地址 (Ctrl+Enter)"
                             Click="BtnSyncNav_Click"/>
 
                     <!-- 全部静音 -->
@@ -238,18 +238,49 @@
 
                     <Border Style="{StaticResource VDiv}"/>
 
+                    <!-- 最大化还原按钮（仅最大化时可见）-->
+                    <Button x:Name="BtnRestoreTile"
+                            Style="{StaticResource ToolBtn}"
+                            Content="⊟ 还原" Margin="0,0,4,0"
+                            Visibility="Collapsed"
+                            Foreground="#4FC3F7"
+                            ToolTip="还原网格视图 (F11 / Escape / 双击角标)"
+                            Click="BtnRestoreTile_Click"/>
+
+                    <!-- 书签 -->
+                    <Button Style="{StaticResource IconBtn}" Content="★" FontSize="16"
+                            ToolTip="书签管理 (Ctrl+B)&#x0a;Ctrl+D 收藏/取消收藏当前页面"
+                            Click="BtnBookmarks_Click"/>
+
+                    <!-- 恢复上次会话 -->
+                    <Button Style="{StaticResource ToolBtn}" Margin="4,0,4,0"
+                            Content="↩ 上次会话" ToolTip="恢复上次关闭前的所有格子页面"
+                            Click="BtnRestoreSession_Click"/>
+
+                    <Border Style="{StaticResource VDiv}"/>
+
                     <!-- 设置按钮 -->
                     <Button Style="{StaticResource IconBtn}" Content="⚙" FontSize="16"
-                            ToolTip="设置" Click="BtnSettings_Click"/>
+                            ToolTip="设置 (Ctrl+,)" Click="BtnSettings_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
 
         <!-- ══ 页面网格区域 ════════════════════════════════════════ -->
         <Border Grid.Row="1" Background="#0A0A14">
+            <!-- 网格视图（正常模式）-->
             <Border x:Name="GridContainer" Padding="4">
                 <UniformGrid x:Name="PageGrid" Rows="3" Columns="3"/>
             </Border>
+        </Border>
+
+        <!-- ══ 最大化单格视图（覆盖整个内容区）══════════════════ -->
+        <Border x:Name="MaximizedContainer"
+                Grid.Row="1"
+                Background="#0A0A14"
+                Visibility="Collapsed"
+                Padding="4">
+            <!-- 最大化的格子将被动态插入这里 -->
         </Border>
 
         <!-- ══ 状态栏 ══════════════════════════════════════════════ -->
