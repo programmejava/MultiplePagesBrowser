@@ -187,6 +187,20 @@ namespace MultiplePagesBrowser
                     tile = new WebTile { Margin = new Thickness(gap / 2) };
                     tile.TileActivationRequested += Tile_ActivationRequested;
                     tile.MaximizeRequested += (s, _) => ToggleTileMaximize((WebTile)s!);
+                    tile.MultiUrlPasteRequested += (s, urls) =>
+                    {
+                        _vm.NavigateMultiple(urls);
+                        StatusBar.Text = $"已从剪贴板展开 {urls.Count} 个链接";
+                    };
+                    tile.AddressFocusRequested += (s, _) =>
+                    {
+                        AddressBar.Focus();
+                        AddressBar.SelectAll();
+                    };
+                    tile.EscapePressed += (s, _) =>
+                    {
+                        if (_isTileMaximized) RestoreTileFromMaximize();
+                    };
                     tile.Page = page;
                     _tilePool[i] = tile;
                 }

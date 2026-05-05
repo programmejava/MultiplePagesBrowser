@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -47,6 +48,10 @@ namespace MultiplePagesBrowser.Controls
         private static readonly SolidColorBrush InactiveBrush =
             new(Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF));
         private static bool IsCtrlDown() => false; // 保留供未来扩展，当前不使用
+
+        [DllImport("user32.dll")]
+        private static extern short GetKeyState(int nVirtKey);
+        private static bool IsCtrlKeyDown() => (GetKeyState(0x11) & 0x8000) != 0; // VK_CONTROL=0x11
         public WebTile()
         {
             // ── 构建 UI 树 ────────────────────────────────────────
@@ -200,13 +205,56 @@ namespace MultiplePagesBrowser.Controls
             MinHeight = 90;
         }
 
-        /// <summary>由 MainWindow 在 Window_KeyDown 中转发 Ctrl+V 给当前激活格子</summary>
+        /// <summary>由 MainWindow 在 Window_KeyDown 中转发 Ctrl+V 给当前激活格子（地址栏有焦点时用）</summary>
         public void HandlePaste()
         {
             string text = Clipboard.GetText().Trim();
             if (IsValidUrl(text) && _page != null)
                 _page.Url = text;
         }
+
+        // ── 持久注入的快捷键拦截脚本 ─────────────────────────────
+        // AddScriptToExecuteOnDocumentCreatedAsync 确保每个页面加载前都注入，
+        // 即使页面跳转也不丢失。脚本发送消息给 C# 侧处理。
+        private static string GetAcceleratorScript() => """
+            (function(){
+              if(window.__hostKeysBound) return;
+              window.__hostKeysBound = true;
+              document.addEventListener('keydown', function(e){
+                var ctrl = e.ctrlKey || e.metaKey;
+                if(ctrl && (e.key === 'v' || e.key === 'V')){
+                  // 只在没有文字输入焦点时拦截（避免阻断 input/textarea 粘贴）
+                  var tag = document.activeElement ? document.activeElement.tagName : '';
+                  if(tag !== 'INPUT' && tag !== 'TEXTAREA' && !document.activeElement.isContentEditable){
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.chrome.webview.postMessage('ctrl-v');
+                  }
+                } else if(ctrl && (e.key === 'l' || e.key === 'L')){
+                  e.preventDefault();
+                  window.chrome.webview.postMessage('ctrl-l');
+                } else if(e.key === 'F11'){
+                  e.preventDefault();
+                  window.chrome.webview.postMessage('f11');
+                } else if(e.key === 'Escape'){
+                  window.chrome.webview.postMessage('esc');
+                }
+              }, {capture:true});
+            })();
+            """;
+
+        // 旧的 CoreWebView2_AcceleratorKeyPressed（已用 JS 方案替代）
+        private void CoreWebView2_AcceleratorKeyPressed(object? sender,
+            CoreWebView2AcceleratorKeyPressedEventArgs e) { }
+
+        /// <summary>格子内按 Ctrl+V 检测到多链接时触发，由 MainWindow 处理布局扩展</summary>
+        public event EventHandler<List<string>>? MultiUrlPasteRequested;
+
+        /// <summary>格子内按 Ctrl+L 时触发，请求聚焦地址栏</summary>
+        public event EventHandler? AddressFocusRequested;
+
+        /// <summary>格子内按 Esc 时触发</summary>
+        public event EventHandler? EscapePressed;
 
         // ── 公开属性：绑定数据模型 ────────────────────────────────
 
@@ -295,13 +343,30 @@ namespace MultiplePagesBrowser.Controls
 
             _webView.CoreWebView2.NavigationCompleted += (s, e) =>
             {
-                if (_page != null) _page.IsLoading = false;
+                if (_page != null)
+                {
+                    _page.IsLoading = false;
+                    // 用真实 Source 同步，避免 SPA history.pushState 导致 _page.Url 过期
+                    string realUrl = _webView.CoreWebView2.Source;
+                    if (!string.IsNullOrEmpty(realUrl) && realUrl != _page.Url)
+                    {
+                        _isNavigating = true;
+                        _page.Url = realUrl;
+                        _isNavigating = false;
+                    }
+                }
                 Dispatcher.Invoke(() => _loadingOverlay.Visibility = Visibility.Collapsed);
                 // 每次页面加载完成后重新注入激活脚本（新页面会清除旧脚本）
                 InjectActivationScript();
             };
 
-            // 收到 JS 消息 "tile-clicked" 时激活本格子
+            // ── 拦截 WebView2 内的加速键（解决 Ctrl+V 等快捷键被 Chromium 吃掉的问题）──
+            // AcceleratorKeyPressed 在此版本 WPF WebView2 中不直接暴露，
+            // 改用 AddScriptToExecuteOnDocumentCreatedAsync 持久注入 JS 拦截。
+            await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+                GetAcceleratorScript());
+
+            // 收到 JS 消息时处理
             _webView.CoreWebView2.WebMessageReceived += (s, e) =>
             {
                 string msg = e.TryGetWebMessageAsString();
@@ -309,10 +374,40 @@ namespace MultiplePagesBrowser.Controls
                 {
                     Dispatcher.Invoke(() => TileActivationRequested?.Invoke(this, _page));
                 }
-                else if (msg == "copy-url" && _page != null &&
-                         !string.IsNullOrEmpty(_page.Url) && _page.Url != "about:blank")
+                else if (msg == "copy-url")
                 {
-                    Dispatcher.Invoke(() => Clipboard.SetText(_page.Url));
+                    Dispatcher.Invoke(() =>
+                    {
+                        string src = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+                        if (!string.IsNullOrEmpty(src) && src != "about:blank")
+                            Clipboard.SetText(src);
+                    });
+                }
+                else if (msg == "ctrl-v")
+                {
+                    // Ctrl+V 在 WebView2 内触发：读剪贴板，是 URL 就导航，否则不处理（让浏览器粘贴文字）
+                    Dispatcher.Invoke(() =>
+                    {
+                        string clip = Clipboard.GetText().Trim();
+                        var urls = MainViewModel.ExtractUrls(clip);
+                        if (urls.Count > 1)
+                            MultiUrlPasteRequested?.Invoke(this, urls);
+                        else if (urls.Count == 1 && _page != null)
+                            _page.Url = urls[0];
+                        // 如果不是 URL，不消费，让 Chromium 执行默认粘贴
+                    });
+                }
+                else if (msg == "ctrl-l")
+                {
+                    Dispatcher.Invoke(() => AddressFocusRequested?.Invoke(this, EventArgs.Empty));
+                }
+                else if (msg == "f11")
+                {
+                    Dispatcher.Invoke(() => MaximizeRequested?.Invoke(this, EventArgs.Empty));
+                }
+                else if (msg == "esc")
+                {
+                    Dispatcher.Invoke(() => EscapePressed?.Invoke(this, EventArgs.Empty));
                 }
             };
 
@@ -495,21 +590,21 @@ namespace MultiplePagesBrowser.Controls
                 Dispatcher.Invoke(() => { if (_page != null && hasUrl) _page.Url = clipText; });
             items.Add(pasteItem);
 
-            // 复制页面链接
-            bool hasPageUrl = _page != null &&
-                !string.IsNullOrEmpty(_page.Url) && _page.Url != "about:blank";
+            // 复制页面链接（始终读 CoreWebView2.Source，反映 SPA 路由后的真实地址）
+            string currentUrl = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+            bool hasPageUrl = !string.IsNullOrEmpty(currentUrl) && currentUrl != "about:blank";
             var copyItem = env.CreateContextMenuItem(
                 "🔗  复制页面链接", null, CoreWebView2ContextMenuItemKind.Command);
             copyItem.IsEnabled = hasPageUrl;
             copyItem.CustomItemSelected += (s, _) =>
                 Dispatcher.Invoke(() =>
                 {
-                    if (_page != null && !string.IsNullOrEmpty(_page.Url))
-                        Clipboard.SetText(_page.Url);
+                    string url = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+                    if (!string.IsNullOrEmpty(url)) Clipboard.SetText(url);
                 });
             items.Add(copyItem);
 
-            // 用外部浏览器打开
+            // 用外部浏览器打开（同样用 Source）
             var extItem = env.CreateContextMenuItem(
                 "🌐  用外部浏览器打开", null, CoreWebView2ContextMenuItemKind.Command);
             extItem.IsEnabled = hasPageUrl;
@@ -522,19 +617,23 @@ namespace MultiplePagesBrowser.Controls
                 string.Empty, null, CoreWebView2ContextMenuItemKind.Separator));
 
             // 收藏到书签 / 取消收藏
-            bool isBookmarked = hasPageUrl && BookmarkStore.Contains(_page!.Url);
+            string bmUrl = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+            bool hasBmUrl = !string.IsNullOrEmpty(bmUrl) && bmUrl != "about:blank";
+            bool isBookmarked = hasBmUrl && BookmarkStore.Contains(bmUrl);
             var bmItem = env.CreateContextMenuItem(
                 isBookmarked ? "★  从书签移除" : "☆  添加到书签",
                 null, CoreWebView2ContextMenuItemKind.Command);
-            bmItem.IsEnabled = hasPageUrl;
+            bmItem.IsEnabled = hasBmUrl;
             bmItem.CustomItemSelected += (s, _) =>
                 Dispatcher.Invoke(() =>
                 {
-                    if (_page == null) return;
-                    if (BookmarkStore.Contains(_page.Url))
-                        BookmarkStore.Remove(_page.Url);
+                    string u = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+                    if (string.IsNullOrEmpty(u)) return;
+                    string title = _page?.Title ?? u;
+                    if (BookmarkStore.Contains(u))
+                        BookmarkStore.Remove(u);
                     else
-                        BookmarkStore.Add(_page.Url, _page.Title);
+                        BookmarkStore.Add(u, title);
                 });
             items.Add(bmItem);
         }
@@ -544,12 +643,13 @@ namespace MultiplePagesBrowser.Controls
         /// <summary>将当前格子页面添加到书签（由 MainWindow Ctrl+D 调用）</summary>
         public void AddBookmark()
         {
-            if (_page == null || string.IsNullOrEmpty(_page.Url) || _page.Url == "about:blank")
-                return;
-            if (BookmarkStore.Contains(_page.Url))
-                BookmarkStore.Remove(_page.Url);
+            string url = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+            if (string.IsNullOrEmpty(url) || url == "about:blank") return;
+            string title = _page?.Title ?? url;
+            if (BookmarkStore.Contains(url))
+                BookmarkStore.Remove(url);
             else
-                BookmarkStore.Add(_page.Url, _page.Title);
+                BookmarkStore.Add(url, title);
         }
 
         private static bool IsValidUrl(string text) =>
@@ -558,13 +658,14 @@ namespace MultiplePagesBrowser.Controls
 
         private void OpenInExternalBrowser()
         {
-            if (_page == null || string.IsNullOrEmpty(_page.Url) || _page.Url == "about:blank")
-                return;
+            // 优先用 CoreWebView2.Source，它始终反映当前真实地址（含 SPA 路由跳转后的地址）
+            string url = _webView?.CoreWebView2?.Source ?? _page?.Url ?? string.Empty;
+            if (string.IsNullOrEmpty(url) || url == "about:blank") return;
             try
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = _page.Url,
+                    FileName = url,
                     UseShellExecute = true
                 });
             }
