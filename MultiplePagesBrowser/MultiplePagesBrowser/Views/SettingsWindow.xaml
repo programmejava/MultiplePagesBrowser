@@ -1,0 +1,224 @@
+<Window x:Class="MultiplePagesBrowser.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="设置" Width="500" Height="520"
+        Background="#0F0F1A"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#4FC3F7"/>
+            <Setter Property="Margin" Value="0,16,0,6"/>
+        </Style>
+        <Style x:Key="SettingLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="HintLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#607d8b"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="InputBox" TargetType="TextBox">
+            <Setter Property="Background" Value="#1E1E2E"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderBrush" Value="#2A2A4A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="#4FC3F7"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="SaveBtn" TargetType="Button">
+            <Setter Property="Background" Value="#4FC3F7"/>
+            <Setter Property="Foreground" Value="#0F0F1A"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="20,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#81D4FA"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#29B6F6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="CancelBtn" TargetType="Button">
+            <Setter Property="Background" Value="#1E1E2E"/>
+            <Setter Property="Foreground" Value="#90CAF9"/>
+            <Setter Property="BorderBrush" Value="#2A2A4A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="20,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#2A2A4A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="24,16,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Grid.Row="0">
+            <StackPanel>
+
+                <!-- ══ 通用 ══════════════════════════ -->
+                <TextBlock Style="{StaticResource SectionTitle}" Text="▸  通用"/>
+                <Border Background="#13131F" CornerRadius="8" Padding="16,12">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="主页地址" Style="{StaticResource SettingLabel}"/>
+                            <TextBox x:Name="TxtHomePage" Grid.Column="1"
+                                     Style="{StaticResource InputBox}"
+                                     ToolTip="打开新格子时默认加载的页面，留空则为空白页"/>
+                        </Grid>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="默认布局" Style="{StaticResource SettingLabel}"/>
+                            <ComboBox x:Name="CmbLayout" Grid.Column="1"
+                                      Background="#1E1E2E" Foreground="#E0E0E0"
+                                      BorderBrush="#2A2A4A" FontSize="13"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- ══ 隐私 ══════════════════════════ -->
+                <TextBlock Style="{StaticResource SectionTitle}" Text="▸  隐私 / Cookie"/>
+                <Border Background="#13131F" CornerRadius="8" Padding="16,12">
+                    <StackPanel>
+                        <CheckBox x:Name="ChkSharedCookies" Content="共享 Cookie / 登录状态"/>
+                        <TextBlock Style="{StaticResource HintLabel}"
+                                   Margin="20,2,0,0"
+                                   Text="开启：所有格子共享同一账号登录&#x0a;关闭：每个格子独立 Cookie，可同时登录多个账号（需重启格子生效）"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ══ 性能 ══════════════════════════ -->
+                <TextBlock Style="{StaticResource SectionTitle}" Text="▸  性能优化"/>
+                <Border Background="#13131F" CornerRadius="8" Padding="16,14">
+                    <StackPanel>
+                        <CheckBox x:Name="ChkPauseVideos"
+                                  Content="非激活格子暂停视频（推荐）"
+                                  Margin="0,0,0,6"/>
+                        <TextBlock Style="{StaticResource HintLabel}" Margin="20,0,0,12"
+                                   Text="激活格子切换时向其它格子注入 JS 暂停 &lt;video&gt; 播放，&#x0a;可大幅降低 GPU 解码占用。切回时自动恢复。"/>
+
+                        <CheckBox x:Name="ChkLowMemory"
+                                  Content="非激活格子降低内存优先级（推荐）"/>
+                        <TextBlock Style="{StaticResource HintLabel}" Margin="20,0,0,12"
+                                   Text="通知 Chromium 对后台格子回收渲染缓存，&#x0a;16 格子同时运行时可节省约 30~50% 内存。"/>
+
+                        <Separator Background="#2A2A4A" Margin="0,4,0,10"/>
+
+                        <!-- 性能说明卡片 -->
+                        <Border Background="#0F1A2A" CornerRadius="6" Padding="12,10"
+                                BorderBrush="#1E3A5F" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Foreground="#4FC3F7" FontSize="12" FontWeight="SemiBold"
+                                           Margin="0,0,0,6" Text="⚡  16格同时播放 YouTube 4K 资源参考"/>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                        <RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Grid.Row="0" Grid.Column="0" FontSize="11" Foreground="#607d8b" Text="未优化 / 全部激活"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1" FontSize="11" Foreground="#FF7043" Text="~16 GB+ 内存、GPU 100%"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" FontSize="11" Foreground="#607d8b" Text="开启本页两项优化后"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" FontSize="11" Foreground="#66BB6A" Text="~4~6 GB 内存、GPU 可控"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="0" FontSize="11" Foreground="#607d8b" Text="建议最低配置"/>
+                                    <TextBlock Grid.Row="2" Grid.Column="1" FontSize="11" Foreground="#FFF176" Text="32 GB RAM + RTX 3060+"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- ══ 外观 ══════════════════════════ -->
+                <TextBlock Style="{StaticResource SectionTitle}" Text="▸  外观"/>
+                <Border Background="#13131F" CornerRadius="8" Padding="16,12">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="130"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="格子间距 (px)" Style="{StaticResource SettingLabel}"/>
+                            <Slider x:Name="SliderGap" Grid.Column="1"
+                                    Minimum="1" Maximum="12" TickFrequency="1"
+                                    IsSnapToTickEnabled="True"
+                                    Foreground="#4FC3F7"
+                                    VerticalAlignment="Center"/>
+                        </Grid>
+                        <CheckBox x:Name="ChkShowNumbers" Content="显示格子编号角标"/>
+                    </StackPanel>
+                </Border>
+
+                <TextBlock Margin="0,16,0,0" FontSize="11" Foreground="#607d8b"
+                           Text="* 部分设置（Cookie 模式、间距）需要重启已打开的格子才能完全生效。"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 底部按钮 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="取消" Style="{StaticResource CancelBtn}"
+                    Margin="0,0,12,0" Click="BtnCancel_Click"/>
+            <Button Content="保存并应用" Style="{StaticResource SaveBtn}"
+                    Click="BtnSave_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

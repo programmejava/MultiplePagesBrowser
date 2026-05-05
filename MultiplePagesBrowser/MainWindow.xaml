@@ -1,0 +1,278 @@
+﻿<Window x:Class="MultiplePagesBrowser.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MultiplePagesBrowser"
+        mc:Ignorable="d"
+        Title="MultiGrid Browser" Height="820" Width="1360"
+        MinWidth="800" MinHeight="500"
+        Background="#0A0A14"
+        WindowStartupLocation="CenterScreen"
+        KeyDown="Window_KeyDown">
+
+    <Window.Resources>
+        <!-- 工具栏图标按钮 -->
+        <Style x:Key="IconBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#90CAF9"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="6" Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E2A3A"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#243444"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 工具栏文字按钮 -->
+        <Style x:Key="ToolBtn" TargetType="Button">
+            <Setter Property="Background" Value="#161624"/>
+            <Setter Property="Foreground" Value="#90CAF9"/>
+            <Setter Property="BorderBrush" Value="#252540"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E2A3A"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A7BD5"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A7BD5"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 布局切换按钮 -->
+        <Style x:Key="LayoutBtn" TargetType="ToggleButton">
+            <Setter Property="Background" Value="#161624"/>
+            <Setter Property="Foreground" Value="#607d8b"/>
+            <Setter Property="BorderBrush" Value="#252540"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="9,4"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A3A5C"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A7BD5"/>
+                                <Setter Property="Foreground" Value="#4FC3F7"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E2A3A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 地址栏 -->
+        <Style x:Key="AddressBox" TargetType="TextBox">
+            <Setter Property="Background" Value="#0E0E1C"/>
+            <Setter Property="Foreground" Value="#D0D8E8"/>
+            <Setter Property="BorderBrush" Value="#252540"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CaretBrush" Value="#4FC3F7"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="17">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A7BD5"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#121220"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#2A4A6A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 分割线样式 -->
+        <Style x:Key="VDiv" TargetType="Border">
+            <Setter Property="Width" Value="1"/>
+            <Setter Property="Background" Value="#252540"/>
+            <Setter Property="Margin" Value="6,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- 标题/工具栏 -->
+            <RowDefinition Height="*"/>     <!-- 页面网格 -->
+            <RowDefinition Height="Auto"/>  <!-- 状态栏 -->
+        </Grid.RowDefinitions>
+
+        <!-- ══ 工具栏 ══════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="#0D0D1B"
+                BorderBrush="#1A1A30" BorderThickness="0,0,0,1"
+                Padding="8,5">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>  <!-- 导航按钮 -->
+                    <ColumnDefinition Width="*"/>     <!-- 地址栏 -->
+                    <ColumnDefinition Width="Auto"/>  <!-- 右侧功能 -->
+                </Grid.ColumnDefinitions>
+
+                <!-- 导航按钮组 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource IconBtn}" Content="◀" ToolTip="后退" Click="BtnBack_Click"/>
+                    <Button Style="{StaticResource IconBtn}" Content="▶" ToolTip="前进" Click="BtnForward_Click"/>
+                    <Button Style="{StaticResource IconBtn}" Content="↺" ToolTip="刷新 (F5)" FontSize="17" Click="BtnReload_Click"/>
+                    <Button Style="{StaticResource IconBtn}" Content="⏹" ToolTip="停止" Click="BtnStop_Click"/>
+                    <Border Style="{StaticResource VDiv}"/>
+                    <Button Style="{StaticResource IconBtn}" Content="🏠" ToolTip="主页" Click="BtnHome_Click"/>
+                </StackPanel>
+
+                <!-- 地址栏区域 -->
+                <Grid Grid.Column="1" Margin="8,0" VerticalAlignment="Center">
+                    <TextBox x:Name="AddressBar"
+                             Style="{StaticResource AddressBox}"
+                             PreviewKeyDown="AddressBar_KeyDown"
+                             GotFocus="AddressBar_GotFocus"
+                             ToolTip="输入网址后按 Enter 导航，按 Ctrl+Enter 所有格子同时导航"/>
+                    <TextBlock x:Name="AddressPlaceholder"
+                               Text="🔍  输入网址... (Enter=当前格子  Ctrl+Enter=全部格子)"
+                               Foreground="#334455" FontSize="12"
+                               VerticalAlignment="Center" Margin="14,0"
+                               IsHitTestVisible="False"/>
+                </Grid>
+
+                <!-- 右侧功能区 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+
+                    <!-- 布局选择器 -->
+                    <Border Background="#0D0D1B" CornerRadius="6"
+                            BorderBrush="#252540" BorderThickness="1"
+                            Padding="6,3" Margin="0,0,4,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="⊞" Foreground="#607d8b" FontSize="13"
+                                       VerticalAlignment="Center" Margin="0,0,5,0"/>
+                            <StackPanel x:Name="LayoutButtonPanel" Orientation="Horizontal"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource VDiv}"/>
+
+                    <!-- 同步导航 -->
+                    <Button Style="{StaticResource ToolBtn}" Margin="0,0,4,0"
+                            Content="同步导航" ToolTip="所有格子同时打开当前地址"
+                            Click="BtnSyncNav_Click"/>
+
+                    <!-- 全部静音 -->
+                    <Button Style="{StaticResource ToolBtn}" Margin="0,0,4,0"
+                            Content="🔇" Width="34" ToolTip="强制所有格子静音"
+                            Click="BtnMuteAll_Click"/>
+
+                    <!-- Cookie 共享 -->
+                    <ToggleButton x:Name="BtnCookieShare"
+                                  Style="{StaticResource LayoutBtn}"
+                                  Content="🍪 共享登录" Margin="0,0,4,0"
+                                  IsChecked="True"
+                                  ToolTip="开启：所有格子共享Cookie/登录状态&#x0a;关闭：每个格子独立Cookie（多账号模式）"
+                                  Click="BtnCookieShare_Click"/>
+
+                    <Border Style="{StaticResource VDiv}"/>
+
+                    <!-- 设置按钮 -->
+                    <Button Style="{StaticResource IconBtn}" Content="⚙" FontSize="16"
+                            ToolTip="设置" Click="BtnSettings_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══ 页面网格区域 ════════════════════════════════════════ -->
+        <Border Grid.Row="1" Background="#0A0A14">
+            <Border x:Name="GridContainer" Padding="4">
+                <UniformGrid x:Name="PageGrid" Rows="3" Columns="3"/>
+            </Border>
+        </Border>
+
+        <!-- ══ 状态栏 ══════════════════════════════════════════════ -->
+        <Border Grid.Row="2"
+                Background="#0D0D1B"
+                BorderBrush="#1A1A30" BorderThickness="0,1,0,0"
+                Padding="12,4">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="StatusBar"
+                           Text="就绪" Foreground="#3A4A5A" FontSize="11"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" x:Name="PerfHint"
+                           Foreground="#2A4A2A" FontSize="11"
+                           VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <TextBlock Grid.Column="2" x:Name="ActivePageLabel"
+                           Text="格子: 1 / 9" Foreground="#3A7BD5" FontSize="11"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
