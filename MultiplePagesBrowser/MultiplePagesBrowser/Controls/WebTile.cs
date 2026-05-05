@@ -315,6 +315,12 @@ namespace MultiplePagesBrowser.Controls
 
             await _webView.EnsureCoreWebView2Async(env);
 
+            // ── Chrome 扩展加载 ───────────────────────────────────
+            await Models.ExtensionManager.LoadExtensionsAsync(_webView.CoreWebView2);
+
+            // ── 用户脚本（document_start）持久注入 ───────────────
+            await InjectUserScriptsOnDocumentCreatedAsync();
+
             // ── 防页面劫持：拦截新窗口请求 ──────────────────────
             _webView.CoreWebView2.NewWindowRequested += CoreWebView2_NewWindowRequested;
 
@@ -358,6 +364,8 @@ namespace MultiplePagesBrowser.Controls
                 Dispatcher.Invoke(() => _loadingOverlay.Visibility = Visibility.Collapsed);
                 // 每次页面加载完成后重新注入激活脚本（新页面会清除旧脚本）
                 InjectActivationScript();
+                // 注入 document_end 用户脚本
+                InjectUserScriptsDocumentEnd(_webView.CoreWebView2.Source);
             };
 
             // ── 拦截 WebView2 内的加速键（解决 Ctrl+V 等快捷键被 Chromium 吃掉的问题）──
@@ -466,6 +474,76 @@ namespace MultiplePagesBrowser.Controls
                     "<span style='font-size:18px;opacity:0.5'>空白页面</span></body></html>");
             else
                 _webView.CoreWebView2.Navigate(url);
+        }
+
+        // ── 用户脚本注入 ──────────────────────────────────────────
+
+        /// <summary>
+        /// 将所有 run-at=document_start 的脚本通过 AddScriptToExecuteOnDocumentCreatedAsync 持久注入。
+        /// 此方法在 EnsureCoreWebView2Async 之后调用一次即可，WebView2 会在每个页面加载前自动执行。
+        /// URL 匹配由脚本自身在运行时判断（通过 window.location.href）。
+        /// </summary>
+        private async Task InjectUserScriptsOnDocumentCreatedAsync()
+        {
+            if (_webView?.CoreWebView2 == null) return;
+            var scripts = Models.UserScriptManager.GetMatchingScripts("*", "document_start");
+            foreach (var s in Models.UserScriptManager.GetAllScripts()
+                                   .Where(s => s.Enabled && s.RunAt == "document_start"))
+            {
+                // 包裹成 IIFE，加入 URL 匹配守卫
+                string wrapped = WrapScript(s);
+                await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(wrapped);
+            }
+        }
+
+        /// <summary>在 NavigationCompleted（document_end）时执行匹配当前 URL 的脚本</summary>
+        private void InjectUserScriptsDocumentEnd(string currentUrl)
+        {
+            if (_webView?.CoreWebView2 == null) return;
+            foreach (var s in Models.UserScriptManager.GetMatchingScripts(currentUrl, "document_end"))
+            {
+                _ = _webView.CoreWebView2.ExecuteScriptAsync(s.Source);
+            }
+        }
+
+        /// <summary>
+        /// 将用户脚本包裹成带 URL 匹配守卫的 IIFE，
+        /// 使 document_start 脚本只在匹配的页面上运行。
+        /// </summary>
+        private static string WrapScript(Models.UserScript s)
+        {
+            if (s.MatchPatterns.Count == 0 && s.ExcludePatterns.Count == 0)
+                return $"(function(){{{s.Source}}})();";
+
+            // 构建 JS 中的 URL 测试函数（把 C# glob 规则转成 JS 正则）
+            var includes = s.MatchPatterns.Select(GlobToJsRegex).ToList();
+            var excludes = s.ExcludePatterns.Select(GlobToJsRegex).ToList();
+
+            string inclTest = includes.Count == 0
+                ? "true"
+                : string.Join("||", includes.Select(r => $"/{r}/.test(u)"));
+            string exclTest = excludes.Count == 0
+                ? "false"
+                : string.Join("||", excludes.Select(r => $"/{r}/.test(u)"));
+
+            return $$"""
+                (function(){
+                  var u = window.location.href;
+                  if(!({{inclTest}})) return;
+                  if({{exclTest}}) return;
+                  {{s.Source}}
+                })();
+                """;
+        }
+
+        private static string GlobToJsRegex(string pattern)
+        {
+            if (pattern == "*" || pattern == "*://*/*") return ".*";
+            string r = System.Text.RegularExpressions.Regex.Escape(pattern)
+                .Replace(@"\*\://", "[a-z]+://")
+                .Replace(@"\*\*", ".*")
+                .Replace(@"\*", "[^/]*");
+            return r;
         }
 
         // ── 声音控制（问题2：声音隔离）───────────────────────────

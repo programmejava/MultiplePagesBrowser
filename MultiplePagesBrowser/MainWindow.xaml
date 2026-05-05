@@ -259,6 +259,11 @@
 
                     <Border Style="{StaticResource VDiv}"/>
 
+                    <!-- 插件管理 -->
+                    <Button Style="{StaticResource IconBtn}" Content="🧩" FontSize="15"
+                            ToolTip="插件管理（Chrome扩展 + 用户脚本）"
+                            Click="BtnPlugins_Click"/>
+
                     <!-- 设置按钮 -->
                     <Button Style="{StaticResource IconBtn}" Content="⚙" FontSize="16"
                             ToolTip="设置 (Ctrl+,)" Click="BtnSettings_Click"/>

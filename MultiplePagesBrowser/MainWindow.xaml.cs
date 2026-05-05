@@ -18,6 +18,7 @@ namespace MultiplePagesBrowser
 
         // 书签窗口保持单例（不重复打开）
         private BookmarksWindow? _bookmarksWindow;
+        private Views.PluginsWindow? _pluginsWindow;
 
         // 最大化状态
         private bool _isTileMaximized = false;
@@ -310,6 +311,17 @@ namespace MultiplePagesBrowser
                 UpdatePerfHint();
                 StatusBar.Text = "设置已保存并应用";
             }
+        }
+
+        private void BtnPlugins_Click(object sender, RoutedEventArgs e)
+        {
+            if (_pluginsWindow != null && _pluginsWindow.IsVisible)
+            {
+                _pluginsWindow.Activate();
+                return;
+            }
+            _pluginsWindow = new Views.PluginsWindow { Owner = this };
+            _pluginsWindow.Show();
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)

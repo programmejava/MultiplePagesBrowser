@@ -1,0 +1,310 @@
+<Window x:Class="MultiplePagesBrowser.Views.PluginsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="插件管理" Height="620" Width="860"
+        MinHeight="460" MinWidth="660"
+        Background="#0A0A14" Foreground="#C8D8E8"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+
+    <Window.Resources>
+        <Style TargetType="TabItem">
+            <Setter Property="Background" Value="#0D0D1B"/>
+            <Setter Property="Foreground" Value="#90CAF9"/>
+            <Setter Property="BorderBrush" Value="#252540"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1,1,1,0" CornerRadius="5,5,0,0"
+                                Margin="2,0" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1A2A3A"/>
+                                <Setter Property="Foreground" Value="#4FC3F7"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#151525"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ActionBtn" TargetType="Button">
+            <Setter Property="Background" Value="#161630"/>
+            <Setter Property="Foreground" Value="#90CAF9"/>
+            <Setter Property="BorderBrush" Value="#2A2A50"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1E2A40"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#3A7BD5"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A7BD5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#445566"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#1A1A30"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DangerBtn" TargetType="Button" BasedOn="{StaticResource ActionBtn}">
+            <Setter Property="Foreground" Value="#EF9A9A"/>
+            <Setter Property="BorderBrush" Value="#5D2A2A"/>
+        </Style>
+
+        <Style TargetType="ListView">
+            <Setter Property="Background" Value="#0E0E1C"/>
+            <Setter Property="BorderBrush" Value="#252540"/>
+            <Setter Property="Foreground" Value="#C0D0E0"/>
+        </Style>
+        <Style TargetType="GridViewColumnHeader">
+            <Setter Property="Background" Value="#13132A"/>
+            <Setter Property="Foreground" Value="#607D8B"/>
+            <Setter Property="BorderBrush" Value="#252540"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+        <Style TargetType="ListViewItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#B0C4D8"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#1A2A3A"/>
+                    <Setter Property="Foreground" Value="#E0F0FF"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#111128"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="DetailLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#607D8B"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,2,0,0"/>
+        </Style>
+        <Style x:Key="DetailValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#90CAF9"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TabControl Background="#0A0A14" BorderBrush="#252540">
+
+            <!-- Tab 1: Chrome 扩展 -->
+            <TabItem Header="Chrome 扩展">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#0D1A2A" CornerRadius="6"
+                            BorderBrush="#1A3A5A" BorderThickness="1" Padding="12,8" Margin="0,0,0,8">
+                        <TextBlock FontSize="11" Foreground="#7A9AB8" TextWrapping="Wrap"
+                                   Text="安装方法：在 Chrome/Edge 打开 chrome://extensions，找到已安装扩展文件夹，复制到下方扩展目录中，重启程序生效。勾选启用/禁用（禁用后重启生效）。"/>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="220"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ListView x:Name="ExtensionList" Grid.Column="0"
+                                  BorderThickness="1" BorderBrush="#252540" Margin="0,0,6,0"
+                                  SelectionChanged="ExtensionList_SelectionChanged">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="启用" Width="44">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                          HorizontalAlignment="Center"
+                                                          Checked="ExtEnabled_Changed"
+                                                          Unchecked="ExtEnabled_Changed"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="扩展名称" Width="180"
+                                                    DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="版本" Width="70"
+                                                    DisplayMemberBinding="{Binding Version}"/>
+                                    <GridViewColumn Header="目录名" Width="160"
+                                                    DisplayMemberBinding="{Binding FolderName}"/>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+
+                        <Border Grid.Column="1" Background="#0D0D1B" CornerRadius="6"
+                                BorderBrush="#252540" BorderThickness="1" Padding="10">
+                            <StackPanel>
+                                <TextBlock Text="扩展详情" Foreground="#4FC3F7"
+                                           FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="名称"/>
+                                <TextBlock x:Name="ExtDetailName" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="版本"/>
+                                <TextBlock x:Name="ExtDetailVersion" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="目录"/>
+                                <TextBlock x:Name="ExtDetailFolder" Style="{StaticResource DetailValue}"
+                                           Text="-" FontFamily="Consolas" FontSize="10"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="描述"/>
+                                <TextBlock x:Name="ExtDetailDesc" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="状态"/>
+                                <TextBlock x:Name="ExtDetailStatus" Style="{StaticResource DetailValue}" Text="-"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,4">
+                        <Button Style="{StaticResource ActionBtn}" Content="打开扩展目录"
+                                Margin="0,0,8,0" Click="BtnOpenExtDir_Click"/>
+                        <Button Style="{StaticResource ActionBtn}" Content="刷新列表"
+                                Margin="0,0,8,0" Click="BtnRefreshExt_Click"/>
+                        <Button x:Name="BtnRemoveExt" Style="{StaticResource DangerBtn}"
+                                Content="删除选中" IsEnabled="False" Click="BtnRemoveExt_Click"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="3" x:Name="ExtStatus" FontSize="11" Foreground="#4A8A4A" Margin="2,0"/>
+                </Grid>
+            </TabItem>
+
+            <!-- Tab 2: 用户脚本 -->
+            <TabItem Header="用户脚本">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Background="#0D1A2A" CornerRadius="6"
+                            BorderBrush="#1A3A5A" BorderThickness="1" Padding="12,8" Margin="0,0,0,8">
+                        <TextBlock FontSize="11" Foreground="#7A9AB8" TextWrapping="Wrap"
+                                   Text="添加方法：点「打开脚本目录」，将 .js 文件放入即可。头部用 // @match *://*/* 控制注入范围。勾选/取消勾选实时启用或禁用（下次页面加载生效），修改脚本后点「刷新」。"/>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="240"/>
+                        </Grid.ColumnDefinitions>
+
+                        <ListView x:Name="ScriptList" Grid.Column="0"
+                                  BorderThickness="1" BorderBrush="#252540" Margin="0,0,6,0"
+                                  SelectionChanged="ScriptList_SelectionChanged">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="启用" Width="44">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}"
+                                                          HorizontalAlignment="Center"
+                                                          Checked="ScriptEnabled_Changed"
+                                                          Unchecked="ScriptEnabled_Changed"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                    <GridViewColumn Header="脚本名称" Width="160"
+                                                    DisplayMemberBinding="{Binding Name}"/>
+                                    <GridViewColumn Header="版本" Width="55"
+                                                    DisplayMemberBinding="{Binding Version}"/>
+                                    <GridViewColumn Header="run-at" Width="90"
+                                                    DisplayMemberBinding="{Binding RunAt}"/>
+                                    <GridViewColumn Header="匹配规则" Width="160">
+                                        <GridViewColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding MatchSummary}"
+                                                           Foreground="#607D8B" FontSize="11"/>
+                                            </DataTemplate>
+                                        </GridViewColumn.CellTemplate>
+                                    </GridViewColumn>
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+
+                        <Border Grid.Column="1" Background="#0D0D1B" CornerRadius="6"
+                                BorderBrush="#252540" BorderThickness="1" Padding="10">
+                            <StackPanel>
+                                <TextBlock Text="脚本详情" Foreground="#4FC3F7"
+                                           FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="名称"/>
+                                <TextBlock x:Name="ScDetailName" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="版本"/>
+                                <TextBlock x:Name="ScDetailVersion" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="描述"/>
+                                <TextBlock x:Name="ScDetailDesc" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="run-at"/>
+                                <TextBlock x:Name="ScDetailRunAt" Style="{StaticResource DetailValue}" Text="-"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="match 规则"/>
+                                <TextBlock x:Name="ScDetailMatch" Style="{StaticResource DetailValue}"
+                                           Text="-" FontFamily="Consolas" FontSize="10"/>
+                                <TextBlock Style="{StaticResource DetailLabel}" Text="文件名"/>
+                                <TextBlock x:Name="ScDetailFile" Style="{StaticResource DetailValue}"
+                                           Text="-" FontFamily="Consolas" FontSize="10"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,4">
+                        <Button Style="{StaticResource ActionBtn}" Content="打开脚本目录"
+                                Margin="0,0,8,0" Click="BtnOpenScriptDir_Click"/>
+                        <Button Style="{StaticResource ActionBtn}" Content="创建示例脚本"
+                                Margin="0,0,8,0" Click="BtnCreateSample_Click"/>
+                        <Button x:Name="BtnEditScript" Style="{StaticResource ActionBtn}"
+                                Content="编辑脚本" IsEnabled="False"
+                                Margin="0,0,8,0" Click="BtnEditScript_Click"/>
+                        <Button Style="{StaticResource ActionBtn}" Content="刷新列表"
+                                Margin="0,0,8,0" Click="BtnRefreshScripts_Click"/>
+                        <Button x:Name="BtnRemoveScript" Style="{StaticResource DangerBtn}"
+                                Content="删除选中" IsEnabled="False"
+                                Click="BtnRemoveScript_Click"/>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="3" x:Name="ScriptStatus" FontSize="11" Foreground="#4A8A4A" Margin="2,0"/>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Button Grid.Row="1" Content="关闭" HorizontalAlignment="Right"
+                Style="{StaticResource ActionBtn}" Margin="0,10,0,0"
+                Width="80" Click="BtnClose_Click"/>
+    </Grid>
+</Window>
