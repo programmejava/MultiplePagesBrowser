@@ -4,231 +4,181 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using MultiplePagesBrowser.Models;
 
-namespace MultiplePagesBrowser.ViewModels
+namespace MultiplePagesBrowser.ViewModels;
+
+public class MainViewModel : INotifyPropertyChanged
 {
-    public class MainViewModel : INotifyPropertyChanged
+    // 保留旧索引，兼容已有设置和会话。
+    public static readonly (int cols, int rows)[] LayoutPresets =
+        { (1, 1), (2, 2), (3, 3), (4, 3), (4, 4), (2, 1), (3, 1), (2, 2) };
+    public string[] LayoutLabels { get; } =
+        { "1格", "4格", "9格", "12格", "16格", "双栏", "三栏", "左大右小" };
+    public static int LayoutCount(int index) => index == 7 ? 3 :
+        LayoutPresets[index].cols * LayoutPresets[index].rows;
+    private int _layoutIndex;
+    private PageItem? _activePage;
+    private string _addressBarText = string.Empty;
+    private SoundMode _soundMode = SoundMode.ActiveOnly;
+    public AppSettings Settings { get; }
+    public static readonly string SharedUserDataFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MultiplePagesBrowser", "SharedProfile");
+    public bool SharedCookies
     {
-        // ── 布局预设 ──────────────────────────────────────────────
-        public static readonly (int cols, int rows)[] LayoutPresets =
-        {
-            (1, 1),   // 1格
-            (2, 2),   // 4格
-            (3, 3),   // 9格  ← 默认
-            (4, 3),   // 12格
-            (4, 4),   // 16格
-        };
-
-        private int _layoutIndex = 2;
-        private int _columns = 3;
-        private int _rows = 3;
-        private PageItem? _activePage;
-        private string _addressBarText = string.Empty;
-
-        /// <summary>全局应用设置</summary>
-        public AppSettings Settings { get; } = AppSettings.Load();
-
-        /// <summary>共享 Cookie 模式下所有格子使用同一个数据目录</summary>
-        public static readonly string SharedUserDataFolder = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "MultiplePagesBrowser", "SharedProfile");
-
-        // 兼容旧代码：直接代理到 Settings
-        public bool SharedCookies
-        {
-            get => Settings.SharedCookies;
-            set { Settings.SharedCookies = value; OnPropertyChanged(); }
-        }
-
-        public ObservableCollection<PageItem> Pages { get; } = new();
-
-        public int Columns
-        {
-            get => _columns;
-            set { _columns = value; OnPropertyChanged(); }
-        }
-
-        public int Rows
-        {
-            get => _rows;
-            set { _rows = value; OnPropertyChanged(); }
-        }
-
-        public int LayoutIndex
-        {
-            get => _layoutIndex;
-            set
-            {
-                if (value < 0 || value >= LayoutPresets.Length) return;
-                _layoutIndex = value;
-                OnPropertyChanged();
-                ApplyLayout(LayoutPresets[value].cols, LayoutPresets[value].rows);
-            }
-        }
-
-        public PageItem? ActivePage
-        {
-            get => _activePage;
-            set
-            {
-                // 取消之前激活格子
-                if (_activePage != null) _activePage.IsActive = false;
-                _activePage = value;
-                if (_activePage != null)
-                {
-                    _activePage.IsActive = true;
-                    AddressBarText = _activePage.Url == "about:blank" ? string.Empty : _activePage.Url;
-                }
-                OnPropertyChanged();
-            }
-        }
-
-        public string AddressBarText
-        {
-            get => _addressBarText;
-            set { _addressBarText = value; OnPropertyChanged(); }
-        }
-
-        // ── 布局切换标题 ──────────────────────────────────────────
-        public string[] LayoutLabels { get; } = { "1格", "4格", "9格", "12格", "16格" };
-
-        /// <summary>布局应用完成后触发一次，通知 UI 重建网格</summary>
-        public event Action? LayoutApplied;
-
-        public MainViewModel()
-        {
-            _layoutIndex = Settings.DefaultLayoutIndex;
-            var (c, r) = LayoutPresets[_layoutIndex];
-            ApplyLayout(c, r);
-        }
-
-        /// <summary>设置保存后调用，热应用可立即生效的选项</summary>
-        public void ApplySettings()
-        {
-            // 通知 UI 间距和编号变更
-            OnPropertyChanged(nameof(Settings));
-            LayoutApplied?.Invoke();
-        }
-
-        /// <summary>
-        /// 切换布局：只增减 PageItem，不销毁已有实例，最后触发一次 LayoutApplied
-        /// </summary>
-        public void ApplyLayout(int cols, int rows)
-        {
-            Columns = cols;
-            Rows = rows;
-
-            int count = cols * rows;
-
-            // 确保有足够的 PageItem（只增加，不销毁已有的）
-            while (Pages.Count < count)
-            {
-                int i = Pages.Count;
-                string folder = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "MultiplePagesBrowser", $"Profile_{i}");
-                Directory.CreateDirectory(folder);
-
-                Pages.Add(new PageItem
-                {
-                    Index = i,
-                    UserDataFolder = folder,
-                    Url = "about:blank",
-                    Title = $"页面 {i + 1}"
-                });
-            }
-
-            // 重新编号（数量只增不减，多余的格子下次切换大布局时复用）
-            for (int i = 0; i < Pages.Count; i++)
-                Pages[i].Index = i;
-
-            // 若当前激活格子超出新布局范围，重置到第一个
-            if (ActivePage == null || ActivePage.Index >= count)
-                ActivePage = Pages.Count > 0 ? Pages[0] : null;
-
-            // 通知 UI：布局已就绪，触发一次重建
-            LayoutApplied?.Invoke();
-        }
-
-        /// <summary>对当前激活格子导航</summary>
-        public void NavigateActive(string url)
-        {
-            if (ActivePage == null) return;
-            if (!url.StartsWith("http://") && !url.StartsWith("https://") && url != "about:blank")
-                url = "https://" + url;
-            ActivePage.Url = url;
-        }
-
-        /// <summary>让所有格子同时导航到同一个 URL</summary>
-        public void NavigateAll(string url)
-        {
-            if (!url.StartsWith("http://") && !url.StartsWith("https://") && url != "about:blank")
-                url = "https://" + url;
-            foreach (var p in Pages)
-                p.Url = url;
-        }
-
-        /// <summary>
-        /// 从文本中提取所有有效 URL（每行一个或空格/逗号分隔）。
-        /// </summary>
-        public static List<string> ExtractUrls(string text)
-        {
-            var result = new List<string>();
-            if (string.IsNullOrWhiteSpace(text)) return result;
-
-            // 按换行、逗号、制表符、分号分割，再逐个检查
-            var tokens = text.Split(new[] { '\r', '\n', '\t', ',', ';' },
-                StringSplitOptions.RemoveEmptyEntries);
-
-            foreach (var token in tokens)
-            {
-                var t = token.Trim();
-                if (string.IsNullOrEmpty(t)) continue;
-
-                // 补全协议头
-                if (!t.StartsWith("http://") && !t.StartsWith("https://"))
-                    t = "https://" + t;
-
-                if (Uri.TryCreate(t, UriKind.Absolute, out var uri) &&
-                    (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-                    result.Add(t);
-            }
-            return result;
-        }
-
-        /// <summary>
-        /// 打开多个 URL：自动扩展布局（取最接近且 >= url数量 的布局），
-        /// 超出现有格子数时创建新 PageItem，再逐格导航。
-        /// </summary>
-        public void NavigateMultiple(List<string> urls)
-        {
-            if (urls.Count == 0) return;
-
-            // 找到能容纳所有 URL 的最小布局
-            int needed = urls.Count;
-            int bestIdx = LayoutPresets.Length - 1; // 默认最大布局
-            for (int i = 0; i < LayoutPresets.Length; i++)
-            {
-                var (c, r) = LayoutPresets[i];
-                if (c * r >= needed)
-                {
-                    bestIdx = i;
-                    break;
-                }
-            }
-
-            // 切换布局（会触发 LayoutApplied 通知 UI）
-            LayoutIndex = bestIdx;
-
-            // 逐个格子赋值 URL
-            for (int i = 0; i < urls.Count && i < Pages.Count; i++)
-                Pages[i].Url = urls[i];
-
-            // 激活第一个格子
-            ActivePage = Pages[0];
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string? name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        get => Settings.SharedCookies;
+        set { Settings.SharedCookies = value; OnPropertyChanged(); }
     }
+    public ObservableCollection<PageItem> Pages { get; } = new();
+    public IEnumerable<PageItem> VisiblePages => Pages.Take(VisibleCount);
+    public int Columns => LayoutPresets[_layoutIndex].cols;
+    public int Rows => LayoutPresets[_layoutIndex].rows;
+    public int VisibleCount => LayoutCount(_layoutIndex);
+    public List<double> ColumnWeights { get; private set; } = new();
+    public List<double> RowWeights { get; private set; } = new();
+    public SoundMode SoundMode
+    {
+        get => _soundMode;
+        set { _soundMode = Enum.IsDefined(value) ? value : SoundMode.ActiveOnly; OnPropertyChanged(); }
+    }
+    public int LayoutIndex
+    {
+        get => _layoutIndex;
+        set
+        {
+            if (value < 0 || value >= LayoutPresets.Length) return;
+            if (_layoutIndex != value) { _layoutIndex = value; ResetProportions(); }
+            OnPropertyChanged();
+            ApplyLayout();
+        }
+    }
+    public PageItem? ActivePage
+    {
+        get => _activePage;
+        set
+        {
+            if (ReferenceEquals(_activePage, value)) return;
+            if (_activePage != null)
+            {
+                _activePage.PropertyChanged -= ActivePageChanged;
+                _activePage.IsActive = false;
+            }
+            _activePage = value;
+            if (value != null)
+            {
+                value.IsActive = true;
+                value.PropertyChanged += ActivePageChanged;
+            }
+            SyncAddress();
+            OnPropertyChanged();
+        }
+    }
+    public string AddressBarText
+    {
+        get => _addressBarText;
+        set { _addressBarText = value; OnPropertyChanged(); }
+    }
+    public event Action? LayoutApplied;
+    public event Action? PagesResetting;
+    public MainViewModel() : this(AppSettings.Load()) { }
+    public MainViewModel(AppSettings settings)
+    {
+        Settings = settings;
+        _layoutIndex = Math.Clamp(settings.DefaultLayoutIndex, 0, LayoutPresets.Length - 1);
+        ResetProportions();
+        ApplyLayout();
+    }
+    private void ActivePageChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PageItem.Url)) SyncAddress();
+    }
+    private void SyncAddress() => AddressBarText = ActivePage?.Url is { } url && url != "about:blank" ? url : "";
+    public void ApplySettings() { OnPropertyChanged(nameof(Settings)); LayoutApplied?.Invoke(); }
+    public void ResetProportions()
+    {
+        ColumnWeights = Enumerable.Repeat(1d, Columns).ToList();
+        RowWeights = Enumerable.Repeat(1d, Rows).ToList();
+        if (_layoutIndex == 7) ColumnWeights[0] = 2;
+    }
+    private void ApplyLayout()
+    {
+        while (Pages.Count < VisibleCount)
+        {
+            int index = Pages.Count;
+            Pages.Add(new PageItem
+            {
+                Index = index,
+                UserDataFolder = Path.Combine(Path.GetDirectoryName(SharedUserDataFolder)!, $"Profile_{index}"),
+                Url = NormalizeUrl(Settings.HomePage) ?? "about:blank"
+            });
+        }
+        Reindex();
+        if (ActivePage == null || ActivePage.Index >= VisibleCount) ActivePage = Pages[0];
+        LayoutApplied?.Invoke();
+    }
+    private void Reindex() { for (int i = 0; i < Pages.Count; i++) Pages[i].Index = i; }
+    public void SwapPages(PageItem source, PageItem target)
+    {
+        int a = Pages.IndexOf(source), b = Pages.IndexOf(target);
+        if (a < 0 || b < 0 || a == b || a >= VisibleCount || b >= VisibleCount) return;
+        Pages[a] = target;
+        Pages[b] = source;
+        Reindex();
+        LayoutApplied?.Invoke();
+    }
+    public static string? NormalizeUrl(string? text)
+    {
+        text = text?.Trim() ?? "";
+        if (text == "about:blank") return text;
+        if (string.IsNullOrWhiteSpace(text) || text.Any(char.IsWhiteSpace)) return null;
+        if (!text.Contains("://")) text = "https://" + text;
+        return Uri.TryCreate(text, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) ? uri.AbsoluteUri : null;
+    }
+    public void NavigateActive(string url)
+    {
+        if (ActivePage != null && NormalizeUrl(url) is { } normalized) ActivePage.Url = normalized;
+    }
+    public void NavigateAll(string url)
+    {
+        if (NormalizeUrl(url) is not { } normalized) return;
+        foreach (var page in VisiblePages) page.Url = normalized;
+    }
+    public static List<string> ExtractUrls(string text) => text.Split(
+        new[] { '\r', '\n', '\t', ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+        .Select(NormalizeUrl).Where(u => u != null).Cast<string>().ToList();
+    public void NavigateMultiple(List<string> urls)
+    {
+        if (urls.Count == 0) return;
+        int needed = Math.Min(urls.Count, 16);
+        LayoutIndex = Enumerable.Range(0, LayoutPresets.Length)
+            .Where(i => LayoutCount(i) >= needed).OrderBy(LayoutCount).ThenBy(i => i).First();
+        for (int i = 0; i < Math.Min(urls.Count, VisibleCount); i++)
+            Pages[i].Url = NormalizeUrl(urls[i]) ?? "about:blank";
+        ActivePage = Pages[0];
+    }
+    public WorkspaceData CaptureWorkspace(string name) => new()
+    {
+        Name = name, LayoutIndex = LayoutIndex,
+        ColumnWeights = ColumnWeights.ToList(), RowWeights = RowWeights.ToList(),
+        ActiveIndex = ActivePage?.Index ?? 0, SoundMode = SoundMode,
+        Panes = VisiblePages.Select(PaneSnapshot.FromPage).ToList()
+    };
+    public void RestoreWorkspace(WorkspaceData workspace)
+    {
+        workspace = workspace.ValidatedCopy();
+        PagesResetting?.Invoke();
+        ActivePage = null;
+        Pages.Clear();
+        _layoutIndex = workspace.LayoutIndex;
+        ColumnWeights = workspace.ColumnWeights;
+        RowWeights = workspace.RowWeights;
+        SoundMode = workspace.SoundMode;
+        foreach (var pane in workspace.Panes) Pages.Add(pane.ToPage(Pages.Count));
+        OnPropertyChanged(nameof(LayoutIndex));
+        ApplyLayout();
+        ActivePage = Pages[Math.Clamp(workspace.ActiveIndex, 0, VisibleCount - 1)];
+    }
+    public event PropertyChangedEventHandler? PropertyChanged;
+    protected void OnPropertyChanged([CallerMemberName] string? name = null)
+        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }

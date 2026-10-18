@@ -235,13 +235,11 @@ namespace MultiplePagesBrowser.Models
             if (pattern == "*" || pattern == "*://*/*") return true;
 
             // 转义特殊字符，然后将 * 替换为 .*
-            string regex = "^" +
-                Regex.Escape(pattern)
-                     .Replace(@"\*\://", @"[a-z]+://")  // *:// → 任意协议
-                     .Replace(@"\*", @"[^/]*")           // 单段 *
-                     .Replace(@"\*\*", @".*")            // ** → 跨路径通配
-                + "$";
-            return Regex.IsMatch(url, regex, RegexOptions.IgnoreCase);
+            return Regex.IsMatch(url, UrlRegex(pattern), RegexOptions.IgnoreCase);
         }
+
+        // 网页端与 C# 使用同一规则，* 可匹配路径内的多段内容。
+        public static string UrlRegex(string pattern) => "^" +
+            Regex.Escape(pattern).Replace(@"\*", ".*") + "$";
     }
 }

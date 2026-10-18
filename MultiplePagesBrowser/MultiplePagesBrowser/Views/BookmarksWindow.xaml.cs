@@ -60,7 +60,7 @@ namespace MultiplePagesBrowser.Views
         {
             if (BookmarkList.SelectedItem is not Bookmark b) return;
             // 找第一个空白格子，没有则在激活格子打开
-            var blank = _vm.Pages.FirstOrDefault(p =>
+            var blank = _vm.VisiblePages.FirstOrDefault(p =>
                 p.Url == "about:blank" || string.IsNullOrEmpty(p.Url));
             if (blank != null)
             {

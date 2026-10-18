@@ -16,6 +16,9 @@ namespace MultiplePagesBrowser.Models
         /// <summary>关闭时的布局索引（对应 MainViewModel.LayoutPresets）</summary>
         public int LayoutIndex { get; set; } = 2;
 
+        /// <summary>新版本保存完整布局和窗格策略，旧 Urls 字段继续保留。</summary>
+        public WorkspaceData? Workspace { get; set; }
+
         /// <summary>各格子 URL（按格子序号排列）</summary>
         public List<string> Urls { get; set; } = new();
 

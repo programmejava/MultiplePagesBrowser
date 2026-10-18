@@ -1,63 +1,56 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace MultiplePagesBrowser.Models
+namespace MultiplePagesBrowser.Models;
+
+public enum PaneRunMode { Continuous, Eco, Paused }
+public enum SoundMode { ActiveOnly, Custom, Muted }
+
+/// <summary>窗格身份与位置分离；换位时浏览器实例和账号数据跟随对象。</summary>
+public class PageItem : INotifyPropertyChanged
 {
-    /// <summary>
-    /// 代表九宫格中一个页面格子的数据模型
-    /// </summary>
-    public class PageItem : INotifyPropertyChanged
+    private int _index;
+    private string _url = "about:blank", _title = "新页面";
+    private bool _isActive, _isMuted = true, _isLoading, _autoRefreshPaused;
+    private double _zoomFactor = 1;
+    private int _refreshIntervalSeconds;
+    private PaneRunMode _runMode;
+
+    public int Index { get => _index; set => Set(ref _index, value); }
+    public string UserDataFolder { get; set; } = string.Empty;
+    public string Url { get => _url; set => Set(ref _url, value); }
+    public string Title { get => _title; set => Set(ref _title, value); }
+    public bool IsActive { get => _isActive; set => Set(ref _isActive, value); }
+    // 用户的声音偏好；实际静音还受全局 SoundMode 控制。
+    public bool IsMuted { get => _isMuted; set => Set(ref _isMuted, value); }
+    public bool IsLoading { get => _isLoading; set => Set(ref _isLoading, value); }
+    public double ZoomFactor
     {
-        private string _url = "about:blank";
-        private string _title = "新标签页";
-        private bool _isActive;
-        private bool _isMuted = true;   // 默认静音，只有激活格子才发声
-        private bool _isLoading;
-
-        public int Index { get; set; }
-
-        /// <summary>独立的 Cookie/Session 存储目录，每个格子不同路径实现账号隔离</summary>
-        public string UserDataFolder { get; set; } = string.Empty;
-
-        public string Url
-        {
-            get => _url;
-            set { _url = value; OnPropertyChanged(); }
-        }
-
-        public string Title
-        {
-            get => _title;
-            set { _title = value; OnPropertyChanged(); }
-        }
-
-        /// <summary>是否为当前焦点格子（影响音频、帧率）</summary>
-        public bool IsActive
-        {
-            get => _isActive;
-            set
-            {
-                _isActive = value;
-                OnPropertyChanged();
-                // 焦点格子发声，其余静音
-                IsMuted = !value;
-            }
-        }
-
-        public bool IsMuted
-        {
-            get => _isMuted;
-            set { _isMuted = value; OnPropertyChanged(); }
-        }
-
-        public bool IsLoading
-        {
-            get => _isLoading;
-            set { _isLoading = value; OnPropertyChanged(); }
-        }
-
-        public event PropertyChangedEventHandler? PropertyChanged;
-        protected void OnPropertyChanged([CallerMemberName] string? name = null)
-            => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        get => _zoomFactor;
+        set => Set(ref _zoomFactor, double.IsFinite(value) ? Math.Clamp(value, .25, 3) : 1);
+    }
+    public PaneRunMode RunMode
+    {
+        get => _runMode;
+        set => Set(ref _runMode, Enum.IsDefined(value) ? value : PaneRunMode.Continuous);
+    }
+    public int RefreshIntervalSeconds
+    {
+        get => _refreshIntervalSeconds;
+        set => Set(ref _refreshIntervalSeconds, Math.Clamp(value, 0, 86400));
+    }
+    public bool AutoRefreshPaused { get => _autoRefreshPaused; set => Set(ref _autoRefreshPaused, value); }
+    public bool ShouldMute(SoundMode mode) => mode switch
+    {
+        SoundMode.Muted => true,
+        SoundMode.ActiveOnly => !IsActive,
+        _ => IsMuted
+    };
+    public event PropertyChangedEventHandler? PropertyChanged;
+    private void Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
+    {
+        if (EqualityComparer<T>.Default.Equals(field, value)) return;
+        field = value;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
 }

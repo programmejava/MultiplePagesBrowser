@@ -172,6 +172,10 @@
                 BorderBrush="#1A1A30" BorderThickness="0,0,0,1"
                 Padding="8,5">
             <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>  <!-- 导航按钮 -->
                     <ColumnDefinition Width="*"/>     <!-- 地址栏 -->
@@ -204,19 +208,6 @@
 
                 <!-- 右侧功能区 -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-
-                    <!-- 布局选择器 -->
-                    <Border Background="#0D0D1B" CornerRadius="6"
-                            BorderBrush="#252540" BorderThickness="1"
-                            Padding="6,3" Margin="0,0,4,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="⊞" Foreground="#607d8b" FontSize="13"
-                                       VerticalAlignment="Center" Margin="0,0,5,0"/>
-                            <StackPanel x:Name="LayoutButtonPanel" Orientation="Horizontal"/>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Style="{StaticResource VDiv}"/>
 
                     <!-- 同步导航 -->
                     <Button Style="{StaticResource ToolBtn}" Margin="0,0,4,0"
@@ -268,6 +259,29 @@
                     <Button Style="{StaticResource IconBtn}" Content="⚙" FontSize="16"
                             ToolTip="设置 (Ctrl+,)" Click="BtnSettings_Click"/>
                 </StackPanel>
+                <WrapPanel Grid.Row="1" Grid.ColumnSpan="3" Margin="0,7,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="布局" Foreground="#90CAF9" VerticalAlignment="Center" Margin="6,0"/>
+                    <ComboBox x:Name="LayoutSelector" Width="105" Height="28" VerticalContentAlignment="Center"
+                              SelectionChanged="LayoutSelector_SelectionChanged"/>
+                    <Button Style="{StaticResource ToolBtn}" Content="重置比例" Margin="5,0,12,0"
+                            Click="ResetProportions_Click" ToolTip="拖动窗格之间的分隔线调整宽高"/>
+                    <TextBlock Text="工作区" Foreground="#90CAF9" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="WorkspaceSelector" Width="145" Height="28" DisplayMemberPath="Name"
+                              VerticalContentAlignment="Center" ToolTip="选择后点击打开；保存才会覆盖已存工作区"/>
+                    <Button Style="{StaticResource ToolBtn}" Content="打开" Margin="5,0,0,0" Click="OpenWorkspace_Click"/>
+                    <Button Style="{StaticResource ToolBtn}" Content="保存" Margin="5,0,0,0" Click="SaveWorkspace_Click"/>
+                    <Button Style="{StaticResource ToolBtn}" Content="另存为" Margin="5,0,0,0" Click="SaveWorkspaceAs_Click"/>
+                    <Button Style="{StaticResource ToolBtn}" Content="删除" Margin="5,0,12,0" Click="DeleteWorkspace_Click"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="声音" Foreground="#90CAF9" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <ComboBox x:Name="SoundSelector" Width="125" Height="28" VerticalContentAlignment="Center"
+                                  SelectionChanged="SoundSelector_SelectionChanged">
+                            <ComboBoxItem Content="仅当前窗格发声"/>
+                            <ComboBoxItem Content="每格独立控制"/>
+                            <ComboBoxItem Content="全部静音"/>
+                        </ComboBox>
+                    </StackPanel>
+                </WrapPanel>
             </Grid>
         </Border>
 
@@ -275,7 +289,7 @@
         <Border Grid.Row="1" Background="#0A0A14">
             <!-- 网格视图（正常模式）-->
             <Border x:Name="GridContainer" Padding="4">
-                <UniformGrid x:Name="PageGrid" Rows="3" Columns="3"/>
+                <Grid x:Name="PageGrid"/>
             </Border>
         </Border>
 
@@ -301,6 +315,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="StatusBar"
                            Text="就绪" Foreground="#3A4A5A" FontSize="11"
+                           TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                            VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1" x:Name="PerfHint"
                            Foreground="#2A4A2A" FontSize="11"

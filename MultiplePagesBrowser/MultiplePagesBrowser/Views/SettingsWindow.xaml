@@ -208,7 +208,8 @@
                 </Border>
 
                 <TextBlock Margin="0,16,0,0" FontSize="11" Foreground="#607d8b"
-                           Text="* 部分设置（Cookie 模式、间距）需要重启已打开的格子才能完全生效。"/>
+                           TextWrapping="Wrap"
+                           Text="* Cookie 模式重启程序后统一生效；间距和编号立即生效。性能选项仅作用于设为「节能」的窗格，持续运行窗格不随焦点暂停。"/>
             </StackPanel>
         </ScrollViewer>
 

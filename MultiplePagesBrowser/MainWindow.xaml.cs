@@ -1,6 +1,5 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using MultiplePagesBrowser.Controls;
 using MultiplePagesBrowser.Models;
@@ -13,7 +12,7 @@ namespace MultiplePagesBrowser
     {
         private readonly MainViewModel _vm = new();
 
-        private readonly Dictionary<int, WebTile> _tilePool = new();
+        private readonly Dictionary<PageItem, WebTile> _tilePool = new();
         private readonly List<WebTile> _activeTiles = new();
 
         // 书签窗口保持单例（不重复打开）
@@ -38,6 +37,7 @@ namespace MultiplePagesBrowser
 
             _vm.LayoutApplied += () => Dispatcher.Invoke(RefreshGrid);
             _vm.PropertyChanged += Vm_PropertyChanged;
+            _vm.PagesResetting += DisposeTiles;
 
             AddressBar.TextChanged += (s, e) =>
                 AddressPlaceholder.Visibility =
@@ -47,9 +47,12 @@ namespace MultiplePagesBrowser
             BuildLayoutButtons();
             RefreshGrid();
             UpdatePerfHint();
+            SoundSelector.SelectedIndex = (int)_vm.SoundMode;
+            ReloadWorkspaces();
 
             // 窗口关闭时保存会话
             Closing += MainWindow_Closing;
+            Closed += (_, _) => DisposeTiles();
         }
 
         // ── 会话保存（窗口关闭时）─────────────────────────────────
@@ -60,8 +63,9 @@ namespace MultiplePagesBrowser
             var session = new SessionData
             {
                 LayoutIndex = _vm.LayoutIndex,
+                Workspace = _vm.CaptureWorkspace("上次会话"),
                 Urls = _vm.Pages
-                    .Take(_vm.Columns * _vm.Rows)
+                    .Take(_vm.VisibleCount)
                     .Select(p => p.Url)
                     .ToList()
             };
@@ -74,6 +78,12 @@ namespace MultiplePagesBrowser
         private void BtnRestoreSession_Click(object sender, RoutedEventArgs e)
         {
             var session = SessionData.Load();
+            if (session.Workspace != null)
+            {
+                _vm.RestoreWorkspace(session.Workspace);
+                StatusBar.Text = "已恢复上次会话及窗格设置";
+                return;
+            }
             if (!session.HasData)
             {
                 StatusBar.Text = "没有找到上次的会话记录";
@@ -88,8 +98,7 @@ namespace MultiplePagesBrowser
             for (int i = 0; i < session.Urls.Count && i < _vm.Pages.Count; i++)
             {
                 string url = session.Urls[i];
-                if (!string.IsNullOrEmpty(url) && url != "about:blank")
-                    _vm.Pages[i].Url = url;
+                _vm.Pages[i].Url = MainViewModel.NormalizeUrl(url ?? "") ?? "about:blank";
             }
 
             StatusBar.Text = $"已恢复上次会话（{session.Urls.Count(u => u != "about:blank" && !string.IsNullOrEmpty(u))} 个页面）";
@@ -120,32 +129,13 @@ namespace MultiplePagesBrowser
 
         private void BuildLayoutButtons()
         {
-            LayoutButtonPanel.Children.Clear();
-            for (int i = 0; i < MainViewModel.LayoutPresets.Length; i++)
-            {
-                int idx = i;
-                var btn = new ToggleButton
-                {
-                    Content = _vm.LayoutLabels[i],
-                    Style = (Style)Resources["LayoutBtn"],
-                    IsChecked = (i == _vm.LayoutIndex),
-                    Tag = i
-                };
-                btn.Click += (s, e) =>
-                {
-                    if (_isTileMaximized) RestoreTileFromMaximize();
-                    _vm.LayoutIndex = idx;
-                    SyncLayoutButtons();
-                    UpdatePerfHint();
-                };
-                LayoutButtonPanel.Children.Add(btn);
-            }
+            LayoutSelector.ItemsSource = _vm.LayoutLabels;
+            SyncLayoutButtons();
         }
 
         private void SyncLayoutButtons()
         {
-            foreach (ToggleButton tb in LayoutButtonPanel.Children)
-                tb.IsChecked = ((int)tb.Tag == _vm.LayoutIndex);
+            LayoutSelector.SelectedIndex = _vm.LayoutIndex;
         }
 
         private void Vm_PropertyChanged(object? sender,
@@ -153,6 +143,10 @@ namespace MultiplePagesBrowser
         {
             switch (e.PropertyName)
             {
+                case nameof(MainViewModel.SoundMode):
+                    SoundSelector.SelectedIndex = (int)_vm.SoundMode;
+                    foreach (var tile in _tilePool.Values) tile.ApplySettings();
+                    break;
                 case nameof(MainViewModel.ActivePage):
                     Dispatcher.Invoke(() => { UpdateStatusBar(); SyncAddressBar(); });
                     break;
@@ -171,11 +165,11 @@ namespace MultiplePagesBrowser
 
         private void RefreshGrid()
         {
-            int count = _vm.Columns * _vm.Rows;
-            PageGrid.Rows = _vm.Rows;
-            PageGrid.Columns = _vm.Columns;
+            if (_isTileMaximized) RestoreTileFromMaximize();
+            int count = _vm.VisibleCount;
             PageGrid.Children.Clear();
             _activeTiles.Clear();
+            BuildResizableGrid();
 
             double gap = _vm.Settings.GridGap;
             GridContainer.Padding = new Thickness(gap);
@@ -183,10 +177,11 @@ namespace MultiplePagesBrowser
             for (int i = 0; i < count; i++)
             {
                 var page = _vm.Pages[i];
-                if (!_tilePool.TryGetValue(i, out var tile))
+                if (!_tilePool.TryGetValue(page, out var tile))
                 {
                     tile = new WebTile { Margin = new Thickness(gap / 2) };
                     tile.TileActivationRequested += Tile_ActivationRequested;
+                    tile.SwapRequested += _vm.SwapPages;
                     tile.MaximizeRequested += (s, _) => ToggleTileMaximize((WebTile)s!);
                     tile.MultiUrlPasteRequested += (s, urls) =>
                     {
@@ -203,13 +198,15 @@ namespace MultiplePagesBrowser
                         if (_isTileMaximized) RestoreTileFromMaximize();
                     };
                     tile.Page = page;
-                    _tilePool[i] = tile;
+                    _tilePool[page] = tile;
                 }
                 else
                 {
                     tile.Margin = new Thickness(gap / 2);
                 }
                 _activeTiles.Add(tile);
+                PlaceTile(tile, i);
+                tile.ApplySettings();
                 PageGrid.Children.Add(tile);
             }
 
@@ -229,7 +226,7 @@ namespace MultiplePagesBrowser
             get
             {
                 if (_vm.ActivePage == null) return null;
-                _tilePool.TryGetValue(_vm.ActivePage.Index, out var t);
+                _tilePool.TryGetValue(_vm.ActivePage, out var t);
                 return t;
             }
         }
@@ -263,7 +260,7 @@ namespace MultiplePagesBrowser
             else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             {
                 _vm.NavigateAll(text);
-                StatusBar.Text = $"已同步导航所有 {_vm.Columns * _vm.Rows} 个格子";
+                StatusBar.Text = $"已同步导航当前 {_vm.VisibleCount} 个窗格";
             }
             else
             {
@@ -281,12 +278,12 @@ namespace MultiplePagesBrowser
             string url = AddressBar.Text.Trim();
             if (string.IsNullOrEmpty(url)) return;
             _vm.NavigateAll(url);
-            StatusBar.Text = $"已同步导航 {_vm.Columns * _vm.Rows} 个格子";
+            StatusBar.Text = $"已同步导航当前 {_vm.VisibleCount} 个窗格";
         }
 
         private void BtnMuteAll_Click(object sender, RoutedEventArgs e)
         {
-            foreach (var p in _vm.Pages) p.IsMuted = true;
+            _vm.SoundMode = SoundMode.Muted;
             StatusBar.Text = "所有格子已静音";
         }
 
@@ -295,9 +292,7 @@ namespace MultiplePagesBrowser
             _vm.SharedCookies = BtnCookieShare.IsChecked == true;
             _vm.Settings.SharedCookies = _vm.SharedCookies;
             _vm.Settings.Save();
-            StatusBar.Text = _vm.SharedCookies
-                ? "Cookie 共享模式：所有格子共享登录状态"
-                : "Cookie 独立模式：每个格子独立账号（需重启格子生效）";
+            StatusBar.Text = "Cookie 模式已保存，重启程序后所有窗格统一生效";
         }
 
         private void BtnSettings_Click(object sender, RoutedEventArgs e)
@@ -395,7 +390,7 @@ namespace MultiplePagesBrowser
                     if (ctrl)
                     {
                         int idx = e.Key - Key.D1;
-                        int maxIdx = _vm.Columns * _vm.Rows - 1;
+                        int maxIdx = _vm.VisibleCount - 1;
                         if (idx <= maxIdx && idx < _vm.Pages.Count)
                             _vm.ActivePage = _vm.Pages[idx];
                         e.Handled = true;
@@ -408,13 +403,12 @@ namespace MultiplePagesBrowser
         {
             if (_vm.ActivePage != null)
                 ActivePageLabel.Text =
-                    $"格子: {_vm.ActivePage.Index + 1} / {_vm.Columns * _vm.Rows}";
+                    $"窗格: {_vm.ActivePage.Index + 1} / {_vm.VisibleCount}";
         }
 
         private void UpdatePerfHint()
         {
-            int total = _vm.Columns * _vm.Rows;
-            PerfHint.Text = total >= 16 ? "⚡ 16格模式：已启用视频暂停+内存降级优化" : string.Empty;
+            PerfHint.Text = "拖动标题换位 · 拖动分隔线调整比例 · ⋯ 设置运行与刷新";
         }
 
         private void SyncAddressBar()
